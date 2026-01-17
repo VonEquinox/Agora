@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI辩经堂</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="bg-orb orb-1"></div>
+    <div class="bg-orb orb-2"></div>
+    <div class="bg-orb orb-3"></div>
+
+    <main class="app">
+      <header class="header">
+        <div>
+          <span class="badge">AI 辩经堂</span>
+          <h1>以理服人，也要有风度</h1>
+          <p class="subtitle">设置辩题与提示词，双 AI 轮番交锋，像微信一样滚动展示。</p>
+        </div>
+        <div class="meta">
+          <div class="meta-item">
+            <span>模式</span>
+            <strong>正反双边</strong>
+          </div>
+          <div class="meta-item">
+            <span>展示</span>
+            <strong>对话流</strong>
+          </div>
+        </div>
+      </header>
+
+      <section class="panel">
+        <form id="setup-form" class="settings">
+          <label class="field">
+            <span>辩题</span>
+            <input
+              id="topic"
+              type="text"
+              placeholder="例如：短视频是否降低了大众专注力？"
+              required
+            />
+          </label>
+
+          <label class="field">
+            <span>正方系统提示词</span>
+            <textarea id="proSystem" rows="3">你是正方。必须理性、客观、克制，严禁诡辩、偷换概念或情绪化攻击。</textarea>
+          </label>
+
+          <label class="field">
+            <span>反方系统提示词</span>
+            <textarea id="conSystem" rows="3">你是反方。必须理性、客观、克制，严禁诡辩、偷换概念或情绪化攻击。</textarea>
+          </label>
+
+          <div class="row">
+            <label class="field">
+              <span>轮数</span>
+              <input id="rounds" type="number" min="1" value="4" />
+            </label>
+            <label class="field">
+              <span>温度</span>
+              <input id="temperature" type="number" min="0" max="2" step="0.1" value="1" />
+            </label>
+          </div>
+
+          <div class="row">
+            <label class="field">
+              <span>正方模型（可选）</span>
+              <input id="proModel" type="text" placeholder="留空使用环境变量" />
+            </label>
+            <label class="field">
+              <span>反方模型（可选）</span>
+              <input id="conModel" type="text" placeholder="留空使用环境变量" />
+            </label>
+          </div>
+
+          <div class="actions">
+            <button id="startBtn" type="submit">开始辩论</button>
+            <button id="stopBtn" type="button" class="ghost">停止</button>
+          </div>
+          <div id="status" class="status">等待设置辩题…</div>
+        </form>
+
+        <div class="chat" id="chatContainer">
+          <div class="chat-head">
+            <span>对话实况</span>
+            <div class="chat-controls">
+              <label class="toggle-label">
+                <input type="checkbox" id="markdownToggle" />
+                <span>Markdown渲染</span>
+              </label>
+              <button id="exportBtn" type="button" class="icon-btn" title="导出JSON">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+              </button>
+              <button id="fullscreenBtn" type="button" class="icon-btn" title="全屏">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div id="chatList" class="chat-list">
+            <div class="hint">点击"开始辩论"后，双方发言会出现在这里。</div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>
