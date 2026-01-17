@@ -24,13 +24,24 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 _client_cache: dict[tuple[str, str], OpenAI] = {}
 
 
+class TranscriptItem(BaseModel):
+    side: str
+    content: str
+
+
 class DebateRequest(BaseModel):
     topic: str = Field(..., min_length=1, max_length=200)
     pro_system: str = Field(
-        default="你是正方。必须理性、客观、克制，严禁诡辩、偷换概念或情绪化攻击。"
+        default=(
+            "你是正方。必须理性、客观、克制，严禁诡辩、偷换概念或情绪化攻击。"
+            "禁止套话/称呼评委/对方辩友/开场寒暄，直接进入观点。"
+        )
     )
     con_system: str = Field(
-        default="你是反方。必须理性、客观、克制，严禁诡辩、偷换概念或情绪化攻击。"
+        default=(
+            "你是反方。必须理性、客观、克制，严禁诡辩、偷换概念或情绪化攻击。"
+            "禁止套话/称呼评委/对方辩友/开场寒暄，直接进入观点。"
+        )
     )
     rounds: int = Field(default=4, ge=1)
     pro_model: Optional[str] = None
@@ -40,6 +51,7 @@ class DebateRequest(BaseModel):
     pro_base_url: Optional[str] = None
     con_base_url: Optional[str] = None
     temperature: float = Field(default=1.0, ge=0.0, le=2.0)
+    transcript: Optional[list[TranscriptItem]] = None
 
 
 def get_client(api_key: str, base_url: Optional[str]) -> OpenAI:
@@ -68,10 +80,6 @@ def mask_key(api_key: str) -> str:
 def _extract_content_from_dict(payload: dict, depth: int = 0) -> str:
     if depth > 3:
         return ""
-
-    text = payload.get("text")
-    if isinstance(text, str) and text.strip():
-        return text.strip()
 
     content = payload.get("content")
     if isinstance(content, str) and content.strip():
@@ -107,7 +115,7 @@ def _extract_content_from_dict(payload: dict, depth: int = 0) -> str:
                         if isinstance(entry_text, str) and entry_text.strip():
                             return entry_text.strip()
 
-    for key in ("part", "item", "response"):
+    for key in ("part", "item"):
         nested = payload.get(key)
         if isinstance(nested, dict):
             nested_text = _extract_content_from_dict(nested, depth + 1)
@@ -118,7 +126,7 @@ def _extract_content_from_dict(payload: dict, depth: int = 0) -> str:
 
 
 def _extract_content_from_sse(text: str) -> str:
-    full_text = ""
+    fallback_text = ""
     delta_parts: list[str] = []
     for line in text.splitlines():
         line = line.strip()
@@ -132,9 +140,6 @@ def _extract_content_from_sse(text: str) -> str:
         except json.JSONDecodeError:
             continue
         if isinstance(payload, dict):
-            candidate = _extract_content_from_dict(payload)
-            if candidate and len(candidate) >= len(full_text):
-                full_text = candidate
             choices = payload.get("choices")
             if isinstance(choices, list) and choices:
                 delta = choices[0].get("delta")
@@ -142,10 +147,15 @@ def _extract_content_from_sse(text: str) -> str:
                     delta_content = delta.get("content")
                     if isinstance(delta_content, str) and delta_content:
                         delta_parts.append(delta_content)
-    if full_text:
-        return full_text
+                        continue
+            if not delta_parts:
+                candidate = _extract_content_from_dict(payload)
+                if candidate and len(candidate) >= len(fallback_text):
+                    fallback_text = candidate
     if delta_parts:
         return "".join(delta_parts)
+    if fallback_text:
+        return fallback_text
     return ""
 
 
@@ -209,6 +219,7 @@ def build_system_prompt(side: str, topic: str, side_prompt: str) -> str:
         f"你是辩论{role}，围绕辩题展开论证。\n"
         f"辩题：{topic}\n"
         f"立场提示：{side_prompt}\n"
+        "禁止套话/称呼评委/对方辩友/开场寒暄，直接进入观点。"
     )
 
 
@@ -273,42 +284,58 @@ def index() -> FileResponse:
     return FileResponse("static/index.html")
 
 
+@app.get("/archive")
+def archive() -> FileResponse:
+    return FileResponse("static/archive.html")
+
+
 @app.post("/api/debate/stream")
 async def debate_stream(request: Request) -> StreamingResponse:
     payload = DebateRequest(**(await request.json()))
     transcript: list[tuple[str, str]] = []
+    if payload.transcript:
+        for item in payload.transcript:
+            side = item.side
+            if side not in ("pro", "con"):
+                raise HTTPException(status_code=400, detail="Invalid transcript side.")
+            transcript.append((side, item.content))
+    total_messages = payload.rounds * 2
+    if len(transcript) > total_messages:
+        raise HTTPException(status_code=400, detail="Transcript length exceeds total rounds.")
 
     async def event_generator():
         try:
-            for _ in range(payload.rounds):
-                for side, side_prompt in (("pro", payload.pro_system), ("con", payload.con_system)):
-                    system_prompt = build_system_prompt(side, payload.topic, side_prompt)
-                    user_prompt = build_user_prompt(transcript, side)
-                    model, api_key, base_url = resolve_side_config(
-                        payload,
-                        side=side,
-                    )
-                    logger.info(
-                        "call model side=%s model=%s base_url=%s key=%s",
-                        side,
-                        model,
-                        base_url or "default",
-                        mask_key(api_key),
-                    )
-                    message = await asyncio.to_thread(
-                        generate_message,
-                        model=model,
-                        system_prompt=system_prompt,
-                        user_prompt=user_prompt,
-                        temperature=payload.temperature,
-                        api_key=api_key,
-                        base_url=base_url,
-                    )
-                    transcript.append((side, message))
-                    yield json.dumps(
-                        {"type": "message", "side": side, "content": message},
-                        ensure_ascii=False,
-                    ) + "\n"
+            start_index = len(transcript)
+            for i in range(start_index, total_messages):
+                side = "pro" if i % 2 == 0 else "con"
+                side_prompt = payload.pro_system if side == "pro" else payload.con_system
+                system_prompt = build_system_prompt(side, payload.topic, side_prompt)
+                user_prompt = build_user_prompt(transcript, side)
+                model, api_key, base_url = resolve_side_config(
+                    payload,
+                    side=side,
+                )
+                logger.info(
+                    "call model side=%s model=%s base_url=%s key=%s",
+                    side,
+                    model,
+                    base_url or "default",
+                    mask_key(api_key),
+                )
+                message = await asyncio.to_thread(
+                    generate_message,
+                    model=model,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    temperature=payload.temperature,
+                    api_key=api_key,
+                    base_url=base_url,
+                )
+                transcript.append((side, message))
+                yield json.dumps(
+                    {"type": "message", "side": side, "content": message},
+                    ensure_ascii=False,
+                ) + "\n"
             yield json.dumps({"type": "done", "count": len(transcript)}, ensure_ascii=False) + "\n"
         except Exception as exc:  # pragma: no cover - streaming path
             logger.exception("debate stream error: %s", exc)

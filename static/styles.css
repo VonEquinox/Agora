@@ -292,12 +292,53 @@ button {
   justify-content: center;
   color: var(--muted);
   transition: all 0.2s ease;
+  text-decoration: none;
 }
 
 .icon-btn:hover {
   background: rgba(255, 136, 85, 0.1);
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.link-btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.config-summary {
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.6);
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.config-summary strong {
+  display: block;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.file-input {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--ink);
+  font-size: 13px;
+  width: 100%;
+}
+
+.import-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .chat-list {

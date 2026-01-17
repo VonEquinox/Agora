@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>辩论回放</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="bg-orb orb-1"></div>
+    <div class="bg-orb orb-2"></div>
+    <div class="bg-orb orb-3"></div>
+
+    <main class="app">
+      <header class="header">
+        <div>
+          <span class="badge">辩论回放</span>
+          <h1>导入 / 导出 JSON 查看辩论</h1>
+          <p class="subtitle">把导出的 JSON 拉进来，立即还原对话流。</p>
+        </div>
+        <div class="meta">
+          <a class="meta-item link-btn" href="/">返回辩论</a>
+        </div>
+      </header>
+
+      <section class="panel">
+        <div class="settings">
+          <label class="field">
+            <span>导入 JSON 文件</span>
+            <input id="importFile" class="file-input" type="file" accept="application/json" />
+          </label>
+
+          <label class="field">
+            <span>或粘贴 JSON</span>
+            <textarea id="importText" rows="8" placeholder="粘贴导出的 JSON 内容"></textarea>
+          </label>
+
+          <div class="import-actions">
+            <button id="loadBtn" type="button">载入</button>
+            <button id="clearBtn" type="button" class="ghost">清空</button>
+            <button id="exportBtn" type="button" class="ghost" disabled>导出当前</button>
+          </div>
+
+          <div id="importStatus" class="status">等待导入…</div>
+          <div id="configSummary" class="config-summary">尚未载入任何辩论记录。</div>
+        </div>
+
+        <div class="chat">
+          <div class="chat-head">
+            <span>对话回放</span>
+            <div class="chat-controls">
+              <label class="toggle-label">
+                <input type="checkbox" id="markdownToggle" />
+                <span>Markdown渲染</span>
+              </label>
+              <button id="fullscreenBtn" type="button" class="icon-btn" title="全屏">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div id="archiveChat" class="chat-list">
+            <div class="hint">导入 JSON 后会显示在这里。</div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+    <script src="/static/archive.js" defer></script>
+  </body>
+</html>

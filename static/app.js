@@ -3,6 +3,7 @@ const chatList = document.getElementById("chatList");
 const statusEl = document.getElementById("status");
 const startBtn = document.getElementById("startBtn");
 const stopBtn = document.getElementById("stopBtn");
+const continueBtn = document.getElementById("continueBtn");
 const chatContainer = document.getElementById("chatContainer");
 const fullscreenBtn = document.getElementById("fullscreenBtn");
 const markdownToggle = document.getElementById("markdownToggle");
@@ -10,6 +11,7 @@ const exportBtn = document.getElementById("exportBtn");
 
 let currentController = null;
 let isMarkdownEnabled = false;
+let canContinue = false;
 let debateTranscript = []; // 存储辩论记录
 let debateConfig = {}; // 存储辩论配置
 
@@ -24,6 +26,12 @@ function setStatus(text, tone) {
 function clearChat() {
   chatList.innerHTML = "";
   debateTranscript = []; // 清空辩论记录
+}
+
+function setButtons(running) {
+  startBtn.disabled = running;
+  stopBtn.disabled = !running;
+  continueBtn.disabled = running || !canContinue;
 }
 
 function scrollToBottom() {
@@ -78,7 +86,8 @@ async function streamDebate(payload) {
 
   currentController = new AbortController();
   setStatus("辩论进行中…", "running");
-  startBtn.disabled = true;
+  canContinue = false;
+  setButtons(true);
 
   try {
     const response = await fetch("/api/debate/stream", {
@@ -122,19 +131,25 @@ async function streamDebate(payload) {
           appendMessage(data.side, data.content);
         } else if (data.type === "error") {
           setStatus(`出错：${data.message}`, "error");
+          canContinue = true;
+          setButtons(false);
         } else if (data.type === "done") {
           setStatus("辩论结束");
+          canContinue = false;
+          setButtons(false);
         }
       }
     }
   } catch (err) {
     if (err.name === "AbortError") {
       setStatus("已停止");
+      canContinue = true;
     } else {
       setStatus(`出错：${err.message}`, "error");
+      canContinue = true;
     }
   } finally {
-    startBtn.disabled = false;
+    setButtons(false);
   }
 }
 
@@ -184,6 +199,30 @@ stopBtn.addEventListener("click", () => {
   }
 });
 
+continueBtn.addEventListener("click", () => {
+  if (!canContinue) {
+    return;
+  }
+  if (!debateConfig || !debateConfig.topic) {
+    setStatus("没有可继续的辩论。", "error");
+    return;
+  }
+  const payload = {
+    topic: debateConfig.topic,
+    pro_system: debateConfig.pro_system,
+    con_system: debateConfig.con_system,
+    rounds: debateConfig.rounds,
+    temperature: debateConfig.temperature,
+    pro_model: debateConfig.pro_model,
+    con_model: debateConfig.con_model,
+    transcript: debateTranscript.map((item) => ({
+      side: item.side,
+      content: item.content,
+    })),
+  };
+  streamDebate(payload);
+});
+
 // 全屏切换功能
 fullscreenBtn.addEventListener("click", () => {
   chatContainer.classList.toggle("fullscreen");
@@ -198,6 +237,8 @@ fullscreenBtn.addEventListener("click", () => {
     svg.innerHTML = '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>';
   }
 });
+
+setButtons(false);
 
 // Markdown 渲染开关
 markdownToggle.addEventListener("change", (e) => {
